@@ -373,6 +373,7 @@ def simulate(accessors: list[MemoryAccessor], memory: PhysicsMemory):
             memory.tick()
 
             if memory.is_free() and not memory.contains(accessor.pid, page_id):
+                print(memory, "= ALLOCATION")
                 memory.allocate(accessor.pid, page_id)
                 continue
 
