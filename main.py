@@ -3,10 +3,10 @@ from collections import deque
 
 
 class MemoryAccessor:
-    def __init__(self, pid: str, page_accesses: list[int]):
+    def __init__(self, pid: str, accesses: list[int]):
         self.pid = pid
-        self.pages_count = max(page_accesses)
-        self.accesses = [f"{pid}{page}" for page in page_accesses]
+
+        self._accesses = [f"{pid}{page}" for page in accesses]
         self._idx = -1
 
     def __iter__(self):
@@ -14,7 +14,7 @@ class MemoryAccessor:
 
     def __next__(self):
         self._idx += 1
-        return self.accesses[self._idx] if self._idx < len(self.accesses) else None
+        return self._accesses[self._idx] if self._idx < len(self._accesses) else None
 
 
 class PageFault(Exception):
@@ -355,9 +355,9 @@ class LocalLruMemory(PhysicsMemory):
                 local[key] += 1
 
 
-def simulate(accessors: list[MemoryAccessor], memory: PhysicsMemory):
+def simulate(accessors: list[MemoryAccessor], memory: PhysicsMemory) -> None:
     print(memory.__class__.__name__)
-    page_fault_count = 0
+    page_faults_count = 0
     finished_accessors = set()
 
     while len(finished_accessors) < len(accessors):
@@ -383,13 +383,13 @@ def simulate(accessors: list[MemoryAccessor], memory: PhysicsMemory):
             except PageFault:
                 print(memory, "= PAGE FAULT -> ", end="")
 
-                page_fault_count += 1
+                page_faults_count += 1
                 swapped_page = memory.swap(accessor.pid)
                 memory.allocate(accessor.pid, page_id)
 
                 print(swapped_page)
 
-    print(f"PAGE FAULTS: {page_fault_count}\n")
+    print(f"PAGE FAULTS: {page_faults_count}\n")
 
 
 def get_accessor_from_name(pid: str, name_in: str) -> MemoryAccessor:
@@ -404,7 +404,15 @@ def get_accessor_from_name(pid: str, name_in: str) -> MemoryAccessor:
     return MemoryAccessor(pid, pages)
 
 
-def get_row_vector_accesses_from_accessors(accessors: list[MemoryAccessor]) -> list[str]:
+def get_accessors(pids: list[str], prev_name: str, name: str, next_name: str) -> list[MemoryAccessor]:
+    return [
+        get_accessor_from_name(pids[0], prev_name),
+        get_accessor_from_name(pids[1], name),
+        get_accessor_from_name(pids[2], next_name)
+    ]
+
+
+def get_row_vector_from_accessors(accessors: list[MemoryAccessor]) -> list[str]:
     vector = list()
     finished_accessors = set()
 
@@ -421,14 +429,6 @@ def get_row_vector_accesses_from_accessors(accessors: list[MemoryAccessor]) -> l
     return vector
 
 
-def get_accessors(pids: list[str], prev_name: str, name: str, next_name: str) -> list[MemoryAccessor]:
-    return [
-        get_accessor_from_name(pids[0], prev_name),
-        get_accessor_from_name(pids[1], name),
-        get_accessor_from_name(pids[2], next_name)
-    ]
-
-
 def main():
     prev_name, name, next_name = (input() for _ in range(3))
 
@@ -436,13 +436,13 @@ def main():
     memory_size = 10
     memories = [
         GlobalOptMemory(
-            get_row_vector_accesses_from_accessors(get_accessors(pids, prev_name, name, next_name)), memory_size
+            get_row_vector_from_accessors(get_accessors(pids, prev_name, name, next_name)), memory_size
         ),
         GlobalFifoMemory(memory_size),
         GlobalLfuMemory(memory_size),
         GlobalLruMemory(memory_size),
         LocalOptMemory(
-            pids, get_row_vector_accesses_from_accessors(get_accessors(pids, prev_name, name, next_name)), memory_size
+            pids, get_row_vector_from_accessors(get_accessors(pids, prev_name, name, next_name)), memory_size
         ),
         LocalFifoMemory(pids, memory_size),
         LocalLfuMemory(pids, memory_size),
